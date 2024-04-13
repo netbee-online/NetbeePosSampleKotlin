@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PosSample</string>
+    <string name="pos_provider">ارائه دهنده پوز</string>
+</resources>
