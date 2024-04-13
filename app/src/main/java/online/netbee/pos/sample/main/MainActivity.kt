@@ -66,7 +66,6 @@ class MainActivity : ComponentActivity() {
         payload: String,
     ) {
         writeExecutor.execute {
-
             try {
                 val sign = sign(amount, posProvider.type, payload)
                     ?: throw SecurityException("cannot generate sign!")
@@ -156,6 +155,35 @@ class MainActivity : ComponentActivity() {
                                 if (!verified) throw SecurityException("cannot verify data")
 
                                 showToast(error)
+                            }
+
+                            "payment_success" -> {
+                                val dataObject = jsonObject.getJSONObject("data")
+
+                                val amount = dataObject.getLong("amount")
+                                val rrn = dataObject.getString("rrn")
+                                val serial = dataObject.getString("serial")
+                                val trace = dataObject.getString("trace")
+                                val cardNumber = dataObject.getString("card_number")
+                                val dateTime = dataObject.getString("datetime")
+                                val payload = dataObject.getString("payload")
+                                val sign = dataObject.getString("sign")
+
+                                val verified = verify(
+                                    publicKey = netbeePublicKey,
+                                    sign = sign,
+                                    amount.toString(),
+                                    rrn,
+                                    serial,
+                                    trace,
+                                    cardNumber,
+                                    dateTime,
+                                    payload
+                                )
+
+                                if (!verified) throw SecurityException("cannot verify data")
+
+                                showToast("تراکنش موفق. کد مرجع: $rrn")
                             }
                         }
                     }
