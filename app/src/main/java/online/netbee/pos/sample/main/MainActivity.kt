@@ -5,7 +5,6 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import java.io.DataInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -34,12 +33,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PosSampleTheme {
-                MainPage { amount, posProvider, payload ->
-                    if (socket?.isConnected == true) {
+                MainPage { amount, posProvider, payload, netbeePublicKey ->
+                    if (socket?.isConnected == true && socket?.isClosed == false) {
                         sendToNetbeePos(amount, posProvider, payload)
                     } else {
-                        connectToNetbeePos {
-                            observeMessages()
+                        connectToNetbeePos { socket ->
+                            inputStream = socket.getInputStream()
+                            outputStream = socket.getOutputStream()
+
+                            observeMessages(netbeePublicKey)
                             sendToNetbeePos(amount, posProvider, payload)
                         }
                     }
@@ -51,7 +53,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
 
-        socket?.close()
+        closeSocket()
+
         writeExecutor.shutdownNow()
         observerExecutor.shutdownNow()
         connectionExecutor.shutdownNow()
@@ -60,9 +63,10 @@ class MainActivity : ComponentActivity() {
     private fun sendToNetbeePos(
         amount: String,
         posProvider: PosProvider,
-        payload: String
+        payload: String,
     ) {
         writeExecutor.execute {
+
             try {
                 val sign = sign(amount, posProvider.type, payload)
                     ?: throw SecurityException("cannot generate sign!")
@@ -81,24 +85,36 @@ class MainActivity : ComponentActivity() {
             } catch (e: IOException) {
                 e.printStackTrace()
 
-                showToast("خطایی در ارسال اطلاعات به نت بی پوز رخداده است.")
+                closeSocket()
+                showToast("خطایی در ارسال اطلاعات به نت بی پوز رخداده است. مجددا تلاش کنید.")
             }
         }
     }
 
-    private fun connectToNetbeePos(onConnected: () -> Unit) {
+    private fun closeSocket() {
+        inputStream?.close()
+        outputStream?.close()
+        socket?.close()
+
+        inputStream = null
+        outputStream = null
+        socket = null
+    }
+
+    private fun connectToNetbeePos(onConnected: (Socket) -> Unit) {
         connectionExecutor.execute {
             socket = Socket().apply {
                 keepAlive = true
                 soTimeout = 0
             }
+
             try {
                 val host = "127.0.0.1"
                 val port = 2448
                 val address = InetSocketAddress(host, port)
 
                 socket?.connect(address)
-                onConnected()
+                onConnected(socket!!)
             } catch (e: Exception) {
                 e.printStackTrace()
                 showToast("خطایی در اتصال به نت بی پوز رخداده است.")
@@ -116,51 +132,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun observeMessages() {
+    private fun observeMessages(netbeePublicKey: String) {
         observerExecutor.execute {
-            socket?.let { socket ->
-                try {
-                    inputStream = socket.getInputStream()
-                    outputStream = socket.getOutputStream()
-                    val bufferedReader = inputStream!!.bufferedReader()
-                    while (true) {
-                        val json = bufferedReader.readLine()
+            try {
+                val bufferedReader = inputStream!!.bufferedReader()
+                while (true) {
+                    val json = bufferedReader.readLine()
 
-                        if (!json.isNullOrBlank()) {
-                            println(json)
+                    if (!json.isNullOrBlank()) {
+                        println(json)
 
-                            val jsonObject = JSONObject(json)
-                            val eventType = jsonObject.getString("type")
+                        val jsonObject = JSONObject(json)
+                        val eventType = jsonObject.getString("type")
 
-                            when (eventType) {
-                                "payment_failed" -> {
-                                    val failedJsonObject = jsonObject.getJSONObject("data")
-                                    val error = failedJsonObject.getString("error")
-                                    val sign = failedJsonObject.getString("sign")
+                        when (eventType) {
+                            "payment_failed" -> {
+                                val failedJsonObject = jsonObject.getJSONObject("data")
+                                val error = failedJsonObject.getString("error")
+                                val sign = failedJsonObject.getString("sign")
 
-                                    val verified = verify(sign, error)
+                                val verified = verify(netbeePublicKey, sign, error)
 
-                                    if (!verified) throw SecurityException("cannot verify data")
+                                if (!verified) throw SecurityException("cannot verify data")
 
-                                    showToast(error)
-                                }
+                                showToast(error)
                             }
                         }
                     }
-
-                } catch (e: IOException) {
-                    e.printStackTrace()
-
-                    showToast("خطایی در ورودی یا خروجی نت بی پوز رخداده است.")
-                } catch (e: SecurityException) {
-                    e.printStackTrace()
-
-                    showToast("خطایی در ساخت یا اعتبارسنجی امضا رخداده است")
-                } catch (e: Exception) {
-                    e.printStackTrace()
-
-                    showToast("خطایی ناشناخته رخداده است")
                 }
+
+            } catch (e: IOException) {
+                e.printStackTrace()
+
+                showToast("خطایی در ورودی یا خروجی نت بی پوز رخداده است.")
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+
+                showToast("خطایی در ساخت یا اعتبارسنجی امضا رخداده است")
+            } catch (e: Exception) {
+                e.printStackTrace()
+
+                showToast("خطایی ناشناخته رخداده است")
             }
         }
     }
@@ -170,12 +182,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun verify(
+        publicKey: String,
         sign: String,
         vararg data: String
     ): Boolean {
         try {
             val netbeePosPublicKey =
-                KeyManager.initializePublicKey(KeyManager.fakePublicKey)
+                KeyManager.initializePublicKey(publicKey)
             val template = createTemplate(data = data)
             println("template: $template")
 

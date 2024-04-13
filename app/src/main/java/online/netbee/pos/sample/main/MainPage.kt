@@ -48,7 +48,7 @@ import online.netbee.pos.sample.security.KeyManager
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun MainPage(onSend: (String, PosProvider, String) -> Unit) {
+fun MainPage(onSend: (String, PosProvider, String, String) -> Unit) {
     var amount by remember {
         mutableStateOf("2000")
     }
@@ -88,7 +88,7 @@ fun MainPage(onSend: (String, PosProvider, String) -> Unit) {
                     )
                 },
                 onClick = {
-                    onSend(amount, posProvider, payload)
+                    onSend(amount, posProvider, payload, netbeePublicKey)
                 }
             )
         }
