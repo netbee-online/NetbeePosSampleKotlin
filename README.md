@@ -1,3 +1,3 @@
 Get the latest version of the document
 
-[📄 Download](https://github.com/netbee-online/NetbeePos/blob/main/NetbeePOS-Protocol.pdf)
+[📄 Download](https://raw.githubusercontent.com/netbee-online/NetbeePos/main/NetbeePOS-Protocol.pdf)
