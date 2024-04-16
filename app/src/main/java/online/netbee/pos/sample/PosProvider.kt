@@ -39,6 +39,11 @@ sealed class PosProvider(
         type = "damavand",
     )
 
+    object Parsian : PosProvider(
+        displayName = "پارسیان",
+        type = "parsian",
+    )
+
     override fun toString(): String {
         return displayName
     }
@@ -52,5 +57,6 @@ val posProviders = listOf(
     PosProvider.Sadad,
     PosProvider.IranKish,
     PosProvider.Damavand,
+    PosProvider.Parsian,
 )
     .sortedBy { pos -> pos.displayName }
