@@ -33,16 +33,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PosSampleTheme {
-                MainPage { amount, posProvider, payload, netbeePublicKey ->
+                MainPage { amount, payload, netbeePublicKey ->
                     if (socket?.isConnected == true && socket?.isClosed == false) {
-                        sendToNetbeePos(amount, posProvider, payload)
+                        sendToNetbeePos(amount, payload)
                     } else {
                         connectToNetbeePos { socket ->
                             inputStream = socket.getInputStream()
                             outputStream = socket.getOutputStream()
 
                             observeMessages(netbeePublicKey)
-                            sendToNetbeePos(amount, posProvider, payload)
+                            sendToNetbeePos(amount, payload)
                         }
                     }
                 }
@@ -62,19 +62,18 @@ class MainActivity : ComponentActivity() {
 
     private fun sendToNetbeePos(
         amount: String,
-        posProvider: PosProvider,
         payload: String,
     ) {
         writeExecutor.execute {
             try {
-                val sign = sign(amount, posProvider.type, payload)
+                val sign = sign(amount, payload)
                     ?: throw SecurityException("cannot generate sign!")
 
                 val json =
                     """
                         {
                             "type": "payment_request",
-                            "data": {"amount":$amount,"provider":"${posProvider.type}","payload":"$payload","sign":"$sign","entity_type":"payment_request"}
+                            "data": {"amount":$amount,"payload":"$payload","sign":"$sign","entity_type":"payment_request"}
                         }
                     """.replace("\n", "").trimIndent()
                 println("writing: $json")
@@ -234,7 +233,6 @@ class MainActivity : ComponentActivity() {
 
     private fun sign(
         amount: String,
-        posProvider: String,
         payload: String
     ): String? {
         try {
@@ -242,7 +240,7 @@ class MainActivity : ComponentActivity() {
                 KeyManager.fakePrivateKey
             )
 
-            val template = createTemplate(amount, posProvider, payload)
+            val template = createTemplate(amount, payload)
             println("template: $template")
 
             val sign = SignatureManager.sign(
