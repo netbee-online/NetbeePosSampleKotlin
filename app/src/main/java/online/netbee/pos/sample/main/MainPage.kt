@@ -48,7 +48,7 @@ import online.netbee.pos.sample.security.KeyManager
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun MainPage(onSend: (String, PosProvider, String, String) -> Unit) {
+fun MainPage(onSend: (String, String, String) -> Unit) {
     var amount by remember {
         mutableStateOf("2000")
     }
@@ -57,13 +57,13 @@ fun MainPage(onSend: (String, PosProvider, String, String) -> Unit) {
         mutableStateOf("""id=1""")
     }
 
-    var providerExpanded by remember {
-        mutableStateOf(false)
-    }
-
-    var posProvider by remember {
-        mutableStateOf(posProviders.first())
-    }
+//    var providerExpanded by remember {
+//        mutableStateOf(false)
+//    }
+//
+//    var posProvider by remember {
+//        mutableStateOf(posProviders.first())
+//    }
 
     var netbeePublicKey by remember {
         mutableStateOf("")
@@ -88,7 +88,7 @@ fun MainPage(onSend: (String, PosProvider, String, String) -> Unit) {
                     )
                 },
                 onClick = {
-                    onSend(amount, posProvider, payload, netbeePublicKey)
+                    onSend(amount, payload, netbeePublicKey)
                 }
             )
         }
@@ -110,59 +110,6 @@ fun MainPage(onSend: (String, PosProvider, String, String) -> Unit) {
                     Text(text = "مبلغ")
                 }
             )
-            ExposedDropdownMenuBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-                expanded = providerExpanded,
-                onExpandedChange = {
-                    providerExpanded = !providerExpanded
-                }
-            ) {
-                OutlinedTextField(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    readOnly = true,
-                    value = posProvider.displayName,
-                    onValueChange = { },
-                    label = {
-                        Text(
-                            text = stringResource(R.string.pos_provider),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = providerExpanded
-                        )
-                    },
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                    textStyle = MaterialTheme.typography.bodySmall,
-                )
-                ExposedDropdownMenu(
-                    expanded = providerExpanded,
-                    onDismissRequest = {
-                        providerExpanded = false
-                    },
-                ) {
-                    posProviders.forEach { provider ->
-                        DropdownMenuItem(
-                            modifier = Modifier,
-                            onClick = {
-                                posProvider = provider
-                                providerExpanded = false
-                            },
-                            text = {
-                                Text(
-                                    text = provider.displayName,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                        )
-                    }
-                }
-            }
 
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
 
