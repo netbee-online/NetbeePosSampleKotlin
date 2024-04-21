@@ -1,5 +1,6 @@
 package online.netbee.pos.sample.main
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,20 +8,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,20 +31,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import online.netbee.pos.sample.PosProvider
-import online.netbee.pos.sample.R
-import online.netbee.pos.sample.posProviders
 import online.netbee.pos.sample.security.KeyManager
 
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun MainPage(onSend: (String, String, String) -> Unit) {
+    val context = LocalContext.current
+    val sharedPreferences = remember {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    }
+
     var amount by remember {
         mutableStateOf("2000")
     }
@@ -66,10 +63,9 @@ fun MainPage(onSend: (String, String, String) -> Unit) {
 //    }
 
     var netbeePublicKey by remember {
-        mutableStateOf("")
+        val key = sharedPreferences.getString("netbee_public_key", "") ?: ""
+        mutableStateOf(key)
     }
-
-    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -88,6 +84,10 @@ fun MainPage(onSend: (String, String, String) -> Unit) {
                     )
                 },
                 onClick = {
+                    sharedPreferences.edit().apply {
+                        putString("netbee_public_key", netbeePublicKey)
+                    }.apply()
+
                     onSend(amount, payload, netbeePublicKey)
                 }
             )
