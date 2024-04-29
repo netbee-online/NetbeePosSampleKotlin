@@ -10,7 +10,10 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import online.netbee.pos.sample.security.KeyManager
 import online.netbee.pos.sample.security.SignatureManager
 import online.netbee.pos.sample.ui.theme.PosSampleTheme
@@ -34,9 +37,7 @@ class MainActivity : ComponentActivity() {
     private var inputStream: InputStream? = null
     private var socket: Socket? = null
 
-    private val writeExecutor = Executors.newSingleThreadExecutor()
-    private val connectionExecutor = Executors.newSingleThreadExecutor()
-    private val observerExecutor = Executors.newSingleThreadExecutor()
+    private val jobs = mutableListOf<Job>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,17 +65,13 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
 
         closeSocket()
-
-        writeExecutor.shutdownNow()
-        observerExecutor.shutdownNow()
-        connectionExecutor.shutdownNow()
     }
 
     private fun sendToNetbeePos(
         amount: String,
         payload: String,
     ) {
-        writeExecutor.execute {
+        val job = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val sign = sign(amount, payload)
                     ?: throw SecurityException("cannot generate sign!")
@@ -102,9 +99,13 @@ class MainActivity : ComponentActivity() {
                 e.printStackTrace()
 
                 showToast("خطایی در ساخت امضا رخداده است.")
-            }
+            } catch (e: Exception) {
+                e.printStackTrace()
 
+                showToast("خطایی نامشخص رخداده است.")
+            }
         }
+        jobs.add(job)
     }
 
     private fun closeSocket() {
@@ -115,14 +116,18 @@ class MainActivity : ComponentActivity() {
         inputStream = null
         outputStream = null
         socket = null
+
+        jobs.forEach { it.cancel() }
+        jobs.clear()
     }
 
     private fun connectToNetbeePos(onConnected: (Socket) -> Unit) {
-        connectionExecutor.execute {
+        val job = CoroutineScope(Dispatchers.IO).launch {
             socket = Socket().apply {
-                keepAlive = true
-                soTimeout = 0
+                keepAlive = false
+                soTimeout = 60_000
             }
+
 
             try {
                 val host = "127.0.0.1"
@@ -136,6 +141,7 @@ class MainActivity : ComponentActivity() {
                 showToast("خطایی در اتصال به نت بی پوز رخداده است.")
             }
         }
+        jobs.add(job)
     }
 
     private fun showToast(message: String) {
@@ -149,13 +155,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun observeMessages(netbeePublicKey: String) {
-        observerExecutor.execute {
+        val job = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val bufferedReader = inputStream!!.bufferedReader()
                 while (true) {
                     val json = bufferedReader.readLine()
 
-                    if (!json.isNullOrBlank()) {
+                    if (json == null) {
+                        closeSocket()
+                        return@launch
+                    }
+
+                    if (json.isNotEmpty()) {
                         println(json)
 
                         val jsonObject = JSONObject(json)
@@ -220,6 +231,7 @@ class MainActivity : ComponentActivity() {
                 showToast("خطایی ناشناخته رخداده است")
             }
         }
+        jobs.add(job)
     }
 
     private fun createTemplate(vararg data: String): String {
