@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
                     """
                         {
                             "type": "payment_request",
-                            "data": {"amount":$amount,"stan_id":$stanId,"payload":"$payload","sign":"$sign","entity_type":"payment_request"}
+                            "data": {"amount":$amount,"stan_id":"$stanId","payload":"$payload","sign":"$sign","entity_type":"payment_request"}
                         }
                     """.replace("\n", "").trimIndent()
 
