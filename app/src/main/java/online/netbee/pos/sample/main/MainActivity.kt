@@ -44,16 +44,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PosSampleTheme {
-                MainPage { amount, payload, netbeePublicKey ->
+                MainPage { amount, stanId, payload, netbeePublicKey ->
                     if (socket?.isConnected == true && socket?.isClosed == false) {
-                        sendToNetbeePos(amount, payload)
+                        sendToNetbeePos(amount, stanId, payload)
                     } else {
                         connectToNetbeePos { socket ->
                             inputStream = socket.getInputStream()
                             outputStream = socket.getOutputStream()
 
                             observeMessages(netbeePublicKey)
-                            sendToNetbeePos(amount, payload)
+                            sendToNetbeePos(amount, stanId, payload)
                         }
                     }
                 }
@@ -69,18 +69,19 @@ class MainActivity : ComponentActivity() {
 
     private fun sendToNetbeePos(
         amount: String,
+        stanId: String,
         payload: String,
     ) {
         val job = CoroutineScope(Dispatchers.IO).launch {
             try {
-                val sign = sign(amount, payload)
+                val sign = sign(amount, stanId, payload)
                     ?: throw SecurityException("cannot generate sign!")
 
                 val json =
                     """
                         {
                             "type": "payment_request",
-                            "data": {"amount":$amount,"payload":"$payload","sign":"$sign","entity_type":"payment_request"}
+                            "data": {"amount":$amount,"stan_id":$stanId,"payload":"$payload","sign":"$sign","entity_type":"payment_request"}
                         }
                     """.replace("\n", "").trimIndent()
 
@@ -176,9 +177,11 @@ class MainActivity : ComponentActivity() {
                             "payment_failed" -> {
                                 val failedJsonObject = jsonObject.getJSONObject("data")
                                 val error = failedJsonObject.getString("error")
+                                val stanId = failedJsonObject.getString("stan_id")
+                                val payload = failedJsonObject.optString("payload") ?: ""
                                 val sign = failedJsonObject.getString("sign")
 
-                                val verified = verify(netbeePublicKey, sign, error)
+                                val verified = verify(netbeePublicKey, sign, error, stanId, payload)
 
                                 if (!verified) throw SecurityException("cannot verify data")
 
@@ -194,6 +197,7 @@ class MainActivity : ComponentActivity() {
                                 val trace = dataObject.getString("trace")
                                 val cardNumber = dataObject.getString("card_number")
                                 val dateTime = dataObject.getString("datetime")
+                                val stanId = dataObject.getString("stan_id")
                                 val payload = dataObject.getString("payload")
                                 val sign = dataObject.getString("sign")
 
@@ -206,6 +210,7 @@ class MainActivity : ComponentActivity() {
                                     trace,
                                     cardNumber,
                                     dateTime,
+                                    stanId,
                                     payload
                                 )
 
@@ -263,6 +268,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sign(
         amount: String,
+        stanId: String,
         payload: String
     ): String? {
         try {
@@ -270,7 +276,7 @@ class MainActivity : ComponentActivity() {
                 KeyManager.fakePrivateKey
             )
 
-            val template = createTemplate(amount, payload)
+            val template = createTemplate(amount, stanId, payload)
             println("template: $template")
 
             val sign = SignatureManager.sign(

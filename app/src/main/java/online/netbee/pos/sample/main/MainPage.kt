@@ -35,12 +35,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import java.util.UUID
 import online.netbee.pos.sample.security.KeyManager
 
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun MainPage(onSend: (String, String, String) -> Unit) {
+fun MainPage(onSend: (String, String, String, String) -> Unit) {
     val context = LocalContext.current
     val sharedPreferences = remember {
         context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -88,7 +89,8 @@ fun MainPage(onSend: (String, String, String) -> Unit) {
                         putString("netbee_public_key", netbeePublicKey)
                     }.apply()
 
-                    onSend(amount, payload, netbeePublicKey)
+                    val stanId = UUID.randomUUID().toString()
+                    onSend(amount, stanId, payload, netbeePublicKey)
                 }
             )
         }
